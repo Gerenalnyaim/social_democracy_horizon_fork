@@ -1,0 +1,463 @@
+title: Prussian Landtag Elections
+new-page: true
+tags: event
+priority: -2
+view-if: (year = next_election_year_prussia and month >= next_election_month_prussia) or (year > next_election_year_prussia)
+on-arrival: last_ministerpresident = ministerpresident; old_ministerpresident = ministerpresident; last_election_month_prussia = month; last_election_year_prussia = year; last_election_time_prussia = time; last_election_time_prussia = time
+on-departure: month_actions += 1; in_election_prussia = 0; next_election_year_prussia = next_election_year_prussia + 4; n_elections_prussia += 1; next_election_time_prussia = time + 48; papen_minister_timer = 0
+set-jump: post_election_prussia_1928
+face-image: img/Rothe_Wahlen_1903.jpg
+
+= Prussian Landtag Elections, [+ month : month +] [+ year +]
+
+The elections to the Prussian Landtag, the parliament of the largest and most populous state in the Reich, are to be held now.
+
+- @post_election_prussia_1928: May we do our best...
+- @cancel_elections_prussia
+
+@cancel_elections_prussia
+title: We cannot hold the Landtag elections now. Cancel the elections.
+subtitle: This is an anti-democratic move that may backfire.
+view-if: in_emergency_government_prussia == 1 and ministerpresident == "Braun" and not presidential_powers
+
+Since the Prussian state government is currently ruling under emergency conditions, we may use quasi-constitutional trickery to significantly delay these Landtag elections.
+
+- @cancel_elections_prussia_2: Yes, do it.
+- @post_election_prussia_1928: No, let's hold the elections.
+
+@cancel_elections_prussia_2
+on-arrival: next_election_year_prussia = next_election_year_prussia + 1; next_election_time_prussia = time + 12; pro_republic -= 8; dvp_relation -= 6; z_relation -= 6; ddp_relation -= 8; kpd_relation -= 8; coup_progress -= 10
+achievement: preussen_ausnahmezustand
+
+Fine. Minister-President [+ ministerpresident +] has taken the unprecedented step of canceling the Prussian Landtag elections. New elections are scheduled for [+ next_election_month_prussia : month +] [+ next_election_year_prussia +].
+
+@post_election_prussia_1928
+on-arrival: {!
+
+Q.PRUSSIA_MODIFIER = {
+    kapd: 1.05,
+    faud: 1.05,
+    kpd:  1.10,
+    sapd: 1.05,
+    lb:   1.00,
+    sl:   1.00,
+    kpo:  1.05,
+    spd:  1.05,
+    srpd: 1.05,
+    rdp:  1.00,
+    ddp:  1.00,
+    dbp:  0.85,
+    cvp:  1.00,
+    z:    1.05,
+    bb:   1.00,
+    bvp:  0.20,
+    csrp: 1.00,
+    sls:  1.00,
+    aspd: 1.00,
+    dhp:  0.60,
+    dsbp: 1.00,
+    dvp:  0.95,
+    vrp:  0.90,
+    wp:   0.95,
+    hl:   1.00,
+    vnr:  1.00,
+    cnbl: 1.10,
+    csvd: 0.90,
+    kvp:  0.90,
+    rlb:  1.15,
+    dnvp: 1.05,
+    dnf:  1.00,
+    other:1.00,
+    nsdap:0.95,
+    dtsp: 1.00,
+    dvfp: 1.00,
+    pp:   1.00,
+    a:    1.05
+};
+
+function prussia_adjust(party, base_support) {
+    var mod = (Q.PRUSSIA_MODIFIER && Q.PRUSSIA_MODIFIER[party] !== undefined) ? Q.PRUSSIA_MODIFIER[party] : 1.0;
+    return base_support * mod;
+}
+
+// === CLEAR GOVERNMENT STATUS ===
+for (var party of Q.parties) {
+    Q[party + '_in_government_prussia'] = 0;
+}
+
+var new_party_sum_prussia = 0;
+var adjusted_support_prussia = {};
+
+// Calculate election results (Prussia-specific)
+for (var party of Q.parties) {
+    Q['old_' + party + '_r_prussia'] = Q[party + '_r_prussia'] ?? 0;
+    Q['old_' + party + '_seat_pct_prussia'] = Q[party + '_seat_pct_prussia'] ?? 0;
+    Q['old_' + party + '_seats_prussia'] = Q[party + '_seats_prussia'] ?? 0;
+
+    var base_support = Q[party + '_support'];
+
+    if (Q[party + '_banned']) {
+        base_support = 0;
+    }
+
+    // Apply the Prussian regional adjustment BEFORE any threshold/ban math
+    adjusted_support_prussia[party] = prussia_adjust(party, base_support);
+
+    if (Q.constitutional_reform > 0) {
+        if (Q[party + '_votes'] < Q.electoral_threshold ||
+            (Q.electoral_threshold > 1 && party === 'other') ||
+            Q[party + '_banned']) {
+            adjusted_support_prussia[party] = 0;
+        }
+    }
+
+    if (Q.math_broken) {
+        adjusted_support_prussia[party] = Q.impossible_add(adjusted_support_prussia[party], 0);
+    }
+
+    new_party_sum_prussia += adjusted_support_prussia[party];
+}
+
+if (Q.math_broken) {
+    new_party_sum_prussia = Q.impossible_multiply(new_party_sum_prussia, 1);
+}
+
+for (var party of Q.parties) {
+    if (Q[party + '_banned'] && !Q.math_broken) {
+        Q[party + '_r_prussia'] = 0;
+        Q[party + '_votes_prussia'] = 0;
+    } else if (!Q.math_broken) {
+        if (new_party_sum_prussia > 0) {
+            Q[party + '_r_prussia'] = (adjusted_support_prussia[party] / new_party_sum_prussia) * 100;
+        } else {
+            Q[party + '_r_prussia'] = 0;
+        }
+        Q[party + '_votes_prussia'] = Math.round(Q[party + '_r_prussia'] * 10) / 10;
+    } else {
+        if (new_party_sum_prussia > 0) {
+            var roll = Math.random();
+            if (roll < 0.3) {
+                Q[party + '_r_prussia'] = (adjusted_support_prussia[party] / new_party_sum_prussia) * 100;
+            } else if (roll < 0.5) {
+                Q[party + '_r_prussia'] = Q.impossible_multiply(adjusted_support_prussia[party], new_party_sum_prussia / 100);
+            } else if (roll < 0.7) {
+                Q[party + '_r_prussia'] = Q.impossible_percentage(adjusted_support_prussia[party]);
+            } else {
+                Q[party + '_r_prussia'] = Q.impossible_add(adjusted_support_prussia[party], new_party_sum_prussia);
+            }
+        } else {
+            Q[party + '_r_prussia'] = Q.impossible_subtract(0, 0);
+        }
+
+        Q[party + '_votes_prussia'] = Q.impossible_multiply(Q[party + '_r_prussia'], 1);
+
+        if (isNaN(Q[party + '_r_prussia'])) Q[party + '_r_prussia'] = Math.random() * 50;
+        if (isNaN(Q[party + '_votes_prussia'])) Q[party + '_votes_prussia'] = Math.random() * 50;
+    }
+}
+
+for (var party of Q.parties) {
+    if (!Q.math_broken) {
+        Q[party + '_r_disp_prussia'] = (Math.round(Q[party + '_r_prussia'] * 10) / 10).toFixed(1);
+
+        Q['change_' + party + '_r_prussia'] = Q[party + '_r_prussia'] - Q['old_' + party + '_r_prussia'];
+        Q['str_change_' + party + '_prussia'] = (Q['change_' + party + '_r_prussia'] >= 0 ? '+' : '') +
+            (Math.ceil(Q['change_' + party + '_r_prussia'] * 10) / 10).toFixed(1);
+    } else {
+        if (Q.use_decimals) {
+            Q[party + '_r_disp_prussia'] = Q.impossible_add(Q[party + '_r_prussia'], 0).toFixed(1);
+        } else {
+            Q[party + '_r_disp_prussia'] = Math.round(Q.impossible_multiply(Q[party + '_r_prussia'], 1)).toString();
+        }
+
+        Q['change_' + party + '_r_prussia'] = Q.impossible_subtract(Q[party + '_r_prussia'], Q['old_' + party + '_r_prussia']);
+
+        if (isNaN(Q['change_' + party + '_r_prussia'])) Q['change_' + party + '_r_prussia'] = Math.random() * 20 - 10;
+
+        var broken_sign = Math.random() < 0.3 ? '-' : '+';
+        if (Math.random() < 0.5) {
+            broken_sign = (Q['change_' + party + '_r_prussia'] >= 0 ? '+' : '');
+        }
+
+        Q['str_change_' + party + '_prussia'] = broken_sign +
+            Q.impossible_add(Q['change_' + party + '_r_prussia'], 0).toFixed(1);
+    }
+}
+
+// The historic 3rd-period Landtag (1928) had 450 seats.
+Q.total_seats_prussia = 450;
+
+Q.election_system_name_prussia = Q.fptp_variable === 1 ? 'First Past the Post' : 'Proportional Representation';
+
+if (Q.fptp_variable === 1) {
+    var fptp_votes_prussia = {};
+    var fptp_sum_prussia = 0;
+    for (var i = 0; i < Q.parties.length; i++) {
+        var party = Q.parties[i];
+        var v = Q[party + '_r_prussia'] || 0;
+        if (v >= 3 && !Q[party + '_banned']) {
+            fptp_votes_prussia[party] = v;
+            fptp_sum_prussia += v;
+        } else {
+            fptp_votes_prussia[party] = 0;
+        }
+    }
+
+    var fptp_normalised_prussia = {};
+    for (var party in fptp_votes_prussia) {
+        fptp_normalised_prussia[party] = fptp_sum_prussia > 0
+            ? (fptp_votes_prussia[party] / fptp_sum_prussia) * 100 : 0;
+    }
+
+    var sq_sum_prussia = 0;
+    var squares_prussia = {};
+    for (var party in fptp_normalised_prussia) {
+        var v = fptp_normalised_prussia[party] / 100;
+        squares_prussia[party] = v * v;
+        sq_sum_prussia += squares_prussia[party];
+    }
+
+    for (var k = 0; k < Q.parties.length; k++) {
+        var party = Q.parties[k];
+        Q[party + '_seats_prussia'] = (sq_sum_prussia > 0 && squares_prussia[party] > 0)
+            ? Math.round((squares_prussia[party] / sq_sum_prussia) * Q.total_seats_prussia)
+            : 0;
+    }
+
+    var fptp_seat_total_prussia = 0;
+    var largest_fptp_party_prussia = null;
+    var largest_fptp_seats_prussia = 0;
+    for (var m = 0; m < Q.parties.length; m++) {
+        var party = Q.parties[m];
+        fptp_seat_total_prussia += Q[party + '_seats_prussia'];
+        if (Q[party + '_seats_prussia'] > largest_fptp_seats_prussia) {
+            largest_fptp_seats_prussia = Q[party + '_seats_prussia'];
+            largest_fptp_party_prussia = party;
+        }
+    }
+    if (largest_fptp_party_prussia) {
+        Q[largest_fptp_party_prussia + '_seats_prussia'] += Q.total_seats_prussia - fptp_seat_total_prussia;
+    }
+} else {
+    for (var party of Q.parties) {
+        if (!Q.math_broken) {
+            Q[party + '_seats_prussia'] = Math.round(Q[party + '_r_prussia'] * 4.5);
+        } else {
+            Q[party + '_seats_prussia'] = Math.round(Q.impossible_multiply(Q[party + '_r_prussia'], 4.5));
+        }
+    }
+}
+
+Q.total_seats_filled_prussia = 0;
+for (var party of Q.parties) {
+    Q.total_seats_filled_prussia += Q[party + '_seats_prussia'];
+}
+
+for (var party of Q.parties) {
+    if (!Q.math_broken) {
+    Q[party + '_seat_pct_prussia'] = Q.total_seats_filled_prussia > 0
+        ? Math.round((Q[party + '_seats_prussia'] / Q.total_seats_filled_prussia) * 1000) / 10
+        : 0;
+    Q[party + '_seats_disp_prussia'] = Q[party + '_seats_prussia'].toString();
+    Q[party + '_seat_pct_disp_prussia'] = Q[party + '_seat_pct_prussia'].toFixed(1);
+    Q['change_' + party + '_seat_pct_prussia'] = Q[party + '_seat_pct_prussia'] - Q['old_' + party + '_seat_pct_prussia'];
+    Q['str_change_' + party + '_seats_prussia'] = (Q['change_' + party + '_seat_pct_prussia'] >= 0 ? '+' : '') +
+        (Math.round(Q['change_' + party + '_seat_pct_prussia'] * 10) / 10).toFixed(1);
+    Q['change_' + party + '_seats_num_prussia'] = Q[party + '_seats_prussia'] - Q['old_' + party + '_seats_prussia'];
+    Q['str_change_' + party + '_seats_num_prussia'] = (Q['change_' + party + '_seats_num_prussia'] >= 0 ? '+' : '') +
+        Q['change_' + party + '_seats_num_prussia'].toString();
+    }
+}
+
+for (var party of Q.parties) {
+    if (Q[party + '_support'] === 0 || Q[party + '_r_prussia'] === 0) {
+        Q[party + '_seats_prussia'] = 0;
+        Q[party + '_seat_pct_prussia'] = 0;
+        Q[party + '_r_prussia'] = 0;
+        Q[party + '_votes_prussia'] = 0;
+    }
+}
+
+Q.coalition_dissent_prussia = 0;
+Q.kpd_coalition_dissent_prussia = 0;
+Q.spd_in_government_prussia = 0;
+Q.in_weimar_coalition_prussia = 0;
+Q.in_grand_coalition_prussia = 0;
+Q.in_left_front_prussia = 0;
+Q.in_popular_front_prussia = 0;
+Q.in_emergency_government_prussia = 0;
+Q.in_minority_government_prussia = 0;
+Q.in_unity_government_prussia = 0;
+Q.spd_toleration_prussia = 0;
+Q.in_bourgeois_coalition_prussia = 0;
+Q.in_right_coalition_prussia = 0;
+Q.in_social_christian_coalition_prussia = 0;
+Q.in_social_liberal_coalition_prussia = 0;
+
+Q.kpd_goals_seen_prussia = 0;
+Q.welfare_goal_prussia = 0;
+Q.agriculture_goal_prussia = 0;
+Q.economy_goal_prussia = 0;
+Q.finance_goal_prussia = 0;
+Q.labor_goal_prussia = 0;
+Q.interior_goal_prussia = 0;
+
+Q.popular_front_possible_prussia = (Q.kpd_party_leader === "Conciliators" && Q.z_party_leader === "Joos") ? 1 : 0;
+Q.left_front_possible_prussia = (Q.communist_coalition >= 3 && Q.kpd_relation >= 50) ? 1 : 0;
+Q.unity_government_possible_prussia = (Q.nazi_urgency >= 6 || Q.pro_republic < 40) ? 1 : 0;
+Q.bourgeois_only_possible_prussia = (Q.year >= 1929 || Q.spd_r_prussia < 25) ? 1 : 0;
+Q.right_coalition_viable_prussia = (Q.dnvp_line !== 3 || Q.z_party_leader === "Kaas") ? 1 : 0;
+
+var election_result_prussia = {'date': new Date(Q.year, Q.month - 1)};
+for (var party of Q.parties) {
+    election_result_prussia[party] = Q[party + '_r_prussia'];
+}
+Q.election_records_prussia = Q.election_records_prussia || [];
+Q.election_records_prussia.push(election_result_prussia);
+!}
+on-display: {!
+Q.partyDataPrussia = [
+{ id: "kapd", name: "KAPD",       color: "#5C0000", row: "far-left",  seats: Q.kapd_seats_prussia, show: !!(Q.kapd_r_prussia > 0) },
+{ id: "faud", name: "FAUD",       color: "#1C1C1C", row: "far-left",  seats: Q.faud_seats_prussia, show: !!(Q.faud_r_prussia > 0) },
+{ id: "kpd",  name: "KPD",        color: "#8B0000", row: "left",      seats: Q.kpd_seats_prussia,  show: !!(Q.kpd_r_prussia  && Q.kpd_r_prussia  > 0) },
+{ id: "a",    name: "A",          color: "#e0107c", row: "left",      seats: Q.a_seats_prussia,    show: !!(Q.a_r_prussia    && Q.a_r_prussia    > 0) },
+{ id: "sapd", name: "SAPD",       color: "#C40000", row: "left",      seats: Q.sapd_seats_prussia, show: !!(Q.sapd_r_prussia && Q.sapd_r_prussia > 0) },
+{ id: "lb",   name: "LB",         color: "#6B0000", row: "left",      seats: Q.lb_seats_prussia,   show: !!(Q.lb_r_prussia   && Q.lb_r_prussia   > 0) },
+{ id: "sl",   name: "SL",         color: "#005B96", row: "left",      seats: Q.sl_seats_prussia,   show: !!(Q.sl_r_prussia   && Q.sl_r_prussia   > 0) },
+{ id: "kpo",  name: "KPO",        color: "#990000", row: "left",      seats: Q.kpo_seats_prussia,  show: !!(Q.kpo_r_prussia  && Q.kpo_r_prussia  > 0) },
+{ id: "spd",  name: "SPD",        color: "#E3000F", row: "left spd",  seats: Q.spd_seats_prussia,  show: !!(Q.spd_r_prussia  && Q.spd_r_prussia  > 0) },
+{ id: "srpd", name: "SRPD",       color: "#FF6B6B", row: "left",      seats: Q.srpd_seats_prussia, show: !!(Q.srpd_r_prussia && Q.srpd_r_prussia > 0) },
+{ id: "rdp",  name: "RDP",        color: "#B8B000", row: "center",    seats: Q.rdp_seats_prussia,  show: !!(Q.rdp_r_prussia  && Q.rdp_r_prussia  > 0) },
+{ id: "ddp",  name: Q.ddp_name,   color: "#DCCA4A", row: "center",    seats: Q.ddp_seats_prussia,  show: !!(Q.ddp_r_prussia  && Q.ddp_r_prussia  > 0) },
+{ id: "dbp",  name: "DBP",        color: "#03A331", row: "liberal",   seats: Q.dbp_seats_prussia,  show: !!(Q.dbp_r_prussia  && Q.dbp_r_prussia  > 0) },
+{ id: "cvp",  name: "CVP",        color: "#1A1A1A", row: "center",    seats: Q.cvp_seats_prussia,  show: !!(Q.cvp_r_prussia  && Q.cvp_r_prussia  > 0) },
+{ id: "z",    name: "Z (Zentrum)",color: "#000000", row: "liberal",   seats: Q.z_seats_prussia,    show: !!(Q.z_r_prussia    && Q.z_r_prussia    > 0) },
+{ id: "bb",   name: "BB",         color: "#69A2BE", row: "liberal",   seats: Q.bb_seats_prussia,   show: !!(Q.bb_r_prussia   && Q.bb_r_prussia   > 0) },
+{ id: "bvp",  name: "BVP",        color: "#69A2BE", row: "liberal",   seats: Q.bvp_seats_prussia,  show: !!(Q.bvp_r_prussia  && Q.bvp_r_prussia  > 0) },
+{ id: "csrp", name: "CSRP",       color: "#FFCCFF", row: "center",    seats: Q.csrp_seats_prussia, show: !!(Q.csrp_r_prussia && Q.csrp_r_prussia > 0) },
+{ id: "sls",  name: "SLS",        color: "#4A7C59", row: "liberal",   seats: Q.sls_seats_prussia,  show: !!(Q.sls_r_prussia  && Q.sls_r_prussia  > 0) },
+{ id: "aspd", name: "ASPD",       color: "#B22222", row: "left",      seats: Q.aspd_seats_prussia, show: !!(Q.aspd_r_prussia && Q.aspd_r_prussia > 0) },
+{ id: "dhp",  name: "DHP",        color: "#69A2BE", row: "liberal",   seats: Q.dhp_seats_prussia,  show: !!(Q.dhp_r_prussia  && Q.dhp_r_prussia  > 0) },
+{ id: "dsbp", name: Q.dsbp_name,  color: Q.dsbp_name === "DLP" ? "#F7FF05" : "#7A9DB5", row: "center", seats: Q.dsbp_seats_prussia, show: !!(Q.dsbp_r_prussia && Q.dsbp_r_prussia > 0) },
+{ id: "dvp",  name: "DVP",        color: "#D5AC27", row: "center",    seats: Q.dvp_seats_prussia,  show: !!(Q.dvp_r_prussia  && Q.dvp_r_prussia  > 0) },
+{ id: "vrp",  name: "VRP",        color: "#8B7355", row: "neutral",   seats: Q.vrp_seats_prussia,  show: !!(Q.vrp_r_prussia  && Q.vrp_r_prussia  > 0) },
+{ id: "wp",   name: "WP",         color: "#424242", row: "neutral",   seats: Q.wp_seats_prussia,   show: !!(Q.wp_r_prussia   && Q.wp_r_prussia   > 0) },
+{ id: "hl",   name: "HL",         color: "#2E8B57", row: "liberal",   seats: Q.hl_seats_prussia,   show: !!(Q.hl_r_prussia   && Q.hl_r_prussia   > 0) },
+{ id: "vnr",  name: "VNR",        color: "#4B5320", row: "right",     seats: Q.vnr_seats_prussia,  show: !!(Q.vnr_r_prussia  && Q.vnr_r_prussia  > 0) },
+{ id: "cnbl", name: "CNBL",       color: "#5D4E37", row: "neutral",   seats: Q.cnbl_seats_prussia, show: !!(Q.cnbl_r_prussia && Q.cnbl_r_prussia > 0) },
+{ id: "csvd", name: "CSVD",       color: "#3f7bc1", row: "right",     seats: Q.csvd_seats_prussia, show: !!(Q.csvd_r_prussia > 0) },
+{ id: "kvp",  name: "KVP",        color: "#3f7bc1", row: "right",     seats: Q.kvp_seats_prussia,  show: !!(Q.kvp_r_prussia  > 0) },
+{ id: "rlb",  name: "RLB",        color: "#4A5D23", row: "right",     seats: Q.rlb_seats_prussia,  show: !!(Q.rlb_r_prussia && Q.rlb_r_prussia > 0) },
+{ id: "dnvp", name: "DNVP",       color: "#3f7bc1", row: "right",     seats: Q.dnvp_seats_prussia, show: !!(Q.dnvp_r_prussia && Q.dnvp_r_prussia > 0) },
+{ id: "dnf",  name: "DNF",        color: "#434F99", row: "far-right", seats: Q.dnf_seats_prussia,  show: !!(Q.dnf_r_prussia && Q.dnf_r_prussia > 0) },
+{ id: "other",name: "Other",      color: "#a0a0a0", row: "neutral",   seats: Q.other_seats_prussia,show: !!(Q.other_r_prussia && Q.other_r_prussia > 0) },
+{ id: "nsdap",name: "NSDAP",      color: "#954B00", row: "far-right", seats: Q.nsdap_seats_prussia,show: !!(Q.nsdap_r_prussia && Q.nsdap_r_prussia > 0) },
+{ id: "dtsp", name: "DtsP",       color: "#3B1A00", row: "far-right", seats: Q.dtsp_seats_prussia, show: !!(Q.dtsp_r_prussia  && Q.dtsp_r_prussia  > 0) },
+{ id: "dvfp", name: "DVFP",       color: "#1A0F00", row: "far-right", seats: Q.dvfp_seats_prussia, show: !!(Q.dvfp_r_prussia && Q.dvfp_r_prussia > 0) },
+{ id: "pp",   name: "PP",         color: "#FF9696", row: "center",    seats: Q.pp_seats_prussia,   show: !!(Q.pp_r_prussia   && Q.pp_r_prussia   > 0) },
+];
+
+var visiblePartiesPrussia = Q.partyDataPrussia.filter(function(p) { return p.show && p.seats > 0; });
+
+var data = visiblePartiesPrussia.map(function(p) {
+    return { id: p.id, legend: p.name, name: p.name, seats: p.seats };
+});
+
+if (window && d3) {
+    var width = 600;
+    var height = 300;
+    var screenWidth = document.getElementById('content').offsetWidth;
+    if (screenWidth < width - 50) {
+        width = screenWidth - 50;
+        height = Math.round(width / 2);
+        document.getElementById("landtag").style.height = height + "px";
+    }
+    document.getElementById("landtag").style.width = width + "px";
+    document.getElementById("landtag").style.height = height + "px";
+
+    var parliament = d3.parliament();
+    parliament.width(width).height(height).innerRadiusCoef(0.4);
+    parliament.enter.fromCenter(true).smallToBig(true);
+    parliament.exit.toCenter(false).bigToSmall(true);
+    d3.select("#landtag").datum(data).call(parliament);
+
+    var totalSeatsPrussia = visiblePartiesPrussia.reduce(function(sum, p) { return sum + p.seats; }, 0);
+    var bar = document.getElementById("party-color-bar-prussia");
+    bar.innerHTML = "";
+    bar.style.display = "flex";
+    bar.style.width = "100%";
+    bar.style.height = "28px";
+    bar.style.marginTop = "8px";
+    bar.style.overflow = "hidden";
+    bar.style.borderRadius = "3px";
+
+    visiblePartiesPrussia.forEach(function(p) {
+        var pct = p.seats / totalSeatsPrussia;
+        var seg = document.createElement("div");
+        seg.style.width = (pct * 100) + "%";
+        seg.style.height = "100%";
+        seg.style.backgroundColor = p.color;
+        seg.style.display = "flex";
+        seg.style.alignItems = "center";
+        seg.style.justifyContent = "center";
+        seg.style.overflow = "hidden";
+        seg.style.boxSizing = "border-box";
+        seg.title = p.name + ": " + p.seats + " seats";
+
+        if (pct > 0.035) {
+            var label = document.createElement("span");
+            label.style.fontSize = "10px";
+            label.style.fontWeight = "bold";
+            label.style.color = "#fff";
+            label.style.textShadow = "0 0 2px #000, 0 0 2px #000";
+            label.style.whiteSpace = "nowrap";
+            label.style.pointerEvents = "none";
+            label.textContent = p.name + " " + Math.round(pct * 100) + "%";
+            seg.appendChild(label);
+        }
+
+        bar.appendChild(seg);
+    });
+}
+
+function buildLandtagTableHTML(Q, partyData) {
+    var rows = partyData.filter(function(p) {
+        return Q[p.id + '_votes_prussia'] > 0;
+    }).map(function(p) {
+        var changeR = Q['change_' + p.id + '_r_prussia'];
+        var changeSeats = Q['change_' + p.id + '_seats_num_prussia'];
+        var rColor = changeR > 0 ? 'color: green;' : (changeR < 0 ? 'color: red;' : '');
+        var sColor = changeSeats > 0 ? 'color: green;' : (changeSeats < 0 ? 'color: red;' : '');
+        return '<tr class="row-' + p.row + '">' +
+            '<td style="padding:8px;"><div class="box" style="background-color:' + p.color + '; display:inline-block; margin-right:8px;"> </div>' + p.name + '</td>' +
+            '<td style="padding:8px; text-align:right; font-weight:bold;">' + Q[p.id + '_r_disp_prussia'] + '%</td>' +
+            '<td style="padding:8px; text-align:right; ' + rColor + '">' + Q['str_change_' + p.id + '_prussia'] + '</td>' +
+            '<td style="padding:8px; text-align:right;">' + Q[p.id + '_seats_prussia'] + '</td>' +
+            '<td style="padding:8px; text-align:right; ' + sColor + '">' + Q['str_change_' + p.id + '_seats_num_prussia'] + '</td>' +
+            '</tr>';
+    }).join('');
+
+    return '<table style="width:100%; border-collapse: collapse;">' +
+        '<tr style="border-bottom: 2px solid #333;">' +
+        '<td style="padding:8px; font-weight:bold;">Party</td>' +
+        '<td style="padding:8px; font-weight:bold; text-align:right;">Votes</td>' +
+        '<td style="padding:8px; font-weight:bold; text-align:right;">Δ Votes</td>' +
+        '<td style="padding:8px; font-weight:bold; text-align:right;">Seats</td>' +
+        '<td style="padding:8px; font-weight:bold; text-align:right;">Δ Seats</td>' +
+        '</tr>' + rows + '</table>';
+}
+
+Q.election_table_html_prussia = buildLandtagTableHTML(Q, Q.partyDataPrussia);
+
+document.getElementById('election-table-prussia').innerHTML = Q.election_table_html_prussia;
+!}
+go-to: coalition_formation_start_prussia
+
+= Prussian Landtag election results
+
+[? if fptp_variable = 1 : <p style="font-size:0.8em; color:#888; font-style:italic;">⚑ First Past the Post seat allocation — cube rule with 5% threshold</p> ?]
+
+{!<svg id="landtag" style="width: 600px; height: 300px;"> </svg>
+<div id="party-color-bar-prussia"></div>!}
+
+{!<div id="election-table-prussia"></div>!}
